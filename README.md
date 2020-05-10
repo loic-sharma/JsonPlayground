@@ -10,8 +10,8 @@ Intel Core i5-6600K CPU 3.50GHz (Skylake), 1 CPU, 4 logical and 4 physical cores
   DefaultJob : .NET Core 3.1.3 (CoreCLR 4.700.20.11803, CoreFX 4.700.20.12001), X64 RyuJIT
 
 
-|         Method |       Mean |    Error |   StdDev |  Gen 0 | Gen 1 | Gen 2 | Allocated |
-|--------------- |-----------:|---------:|---------:|-------:|------:|------:|----------:|
-| NewtonsoftJson |   647.7 ns |  4.58 ns |  3.83 ns | 1.7872 |     - |     - |    5608 B |
-| SystemTextJson | 4,543.8 ns | 26.06 ns | 24.38 ns | 0.2899 |     - |     - |     912 B |
+|         Method |      Mean |     Error |    StdDev |    Median |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|--------------- |----------:|----------:|----------:|----------:|-------:|------:|------:|----------:|
+| NewtonsoftJson | 674.80 ns | 13.344 ns | 22.295 ns | 664.58 ns | 1.7872 |     - |     - |    5608 B |
+| SystemTextJson |  53.77 ns |  0.443 ns |  0.393 ns |  53.61 ns | 0.0178 |     - |     - |      56 B |
 ```

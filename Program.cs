@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -52,7 +54,7 @@ namespace JsonPlayground
         {
             var reader = new Utf8JsonReader(_jsonBytes);
 
-            return reader.GetCatalogPage();
+            return reader.ReadCatalogPage();
         }
     }
 
@@ -68,51 +70,39 @@ namespace JsonPlayground
         private static readonly JsonEncodedText NuGetPackageDetailsName = JsonEncodedText.Encode("nuget:PackageDetails");
         private static readonly JsonEncodedText NuGetVersionName = JsonEncodedText.Encode("nuget:version");
 
-        public static CatalogPage GetCatalogPage(ref this Utf8JsonReader reader)
+        public static CatalogPage ReadCatalogPage(ref this Utf8JsonReader reader)
         {
             var result = new CatalogPage();
             
-            Assert(reader.Read());
-            //Assert(reader.TokenType == JsonTokenType.StartObject);
-            Assert(reader.Read());
+            reader.ReadStartObject();
+            Debug.Assert(reader.Read());
 
             while (reader.TokenType == JsonTokenType.PropertyName)
             {
                 if (reader.ValueTextEquals(AtIdName.EncodedUtf8Bytes))
                 {
-                    reader.Read();
-                    //Assert(reader.TokenType == JsonTokenType.String);
-                    result.CatalogIndexUrl = reader.GetString();
+                    result.CatalogIndexUrl = reader.ReadString();
                 }
                 else if (reader.ValueTextEquals(CountName.EncodedUtf8Bytes))
                 {
-                    reader.Read();
-                    //Assert(reader.TokenType == JsonTokenType.Number);
-                    result.Count = reader.GetInt32();
+                    result.Count = reader.ReadInt32();
                 }
                 else if (reader.ValueTextEquals(CommitTimestampName.EncodedUtf8Bytes))
                 {
-                    reader.Read();
-                    //Assert(reader.TokenType == JsonTokenType.String);
-                    Assert(reader.TryGetDateTimeOffset(out var commitTimestamp));
-                    result.CommitTimestamp = commitTimestamp;
+                    result.CommitTimestamp = reader.ReadDateTimeOffset();
                 }
                 else if (reader.ValueTextEquals(ItemsName.EncodedUtf8Bytes))
                 {
-                    reader.Read();
-                    //Assert(reader.TokenType == JsonTokenType.StartArray);
-                    Assert(reader.Read());
                     result.Items = new List<CatalogLeafItem>();
 
-                    while (reader.TokenType == JsonTokenType.StartObject)
-                    {
-                        result.Items.Add(reader.GetCatalogLeafItem());
+                    reader.ReadStartArray();
 
-                        //Assert(reader.TokenType == JsonTokenType.EndObject);
-                        Assert(reader.Read());
+                    while (reader.TryReadCatalogLeafItem(out var leaf))
+                    {
+                        result.Items.Add(leaf);
                     }
 
-                    //Assert(reader.TokenType == JsonTokenType.EndArray);
+                    Debug.Assert(reader.TokenType == JsonTokenType.EndArray);
                 }
                 else
                 {
@@ -120,33 +110,38 @@ namespace JsonPlayground
                     reader.Skip();
                 }
 
-                Assert(reader.Read());
+                Debug.Assert(reader.Read());
             }
 
-            //Assert(reader.TokenType == JsonTokenType.EndObject);
+            Debug.Assert(reader.TokenType == JsonTokenType.EndObject);
 
             return result;
         }
 
-        private static CatalogLeafItem GetCatalogLeafItem(ref this Utf8JsonReader reader)
+        private static bool TryReadCatalogLeafItem(ref this Utf8JsonReader reader, out CatalogLeafItem leaf)
         {
-            var leaf = new CatalogLeafItem();
+            Debug.Assert(reader.Read());
 
-            //Assert(reader.TokenType == JsonTokenType.StartObject);
-            Assert(reader.Read());
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                leaf = null;
+                return false;
+            }
+
+            leaf = new CatalogLeafItem();
+
+            Debug.Assert(reader.Read());
 
             while (reader.TokenType == JsonTokenType.PropertyName)
             {
                 if (reader.ValueTextEquals(AtIdName.EncodedUtf8Bytes))
                 {
-                    reader.Read();
-                    //Assert(reader.TokenType == JsonTokenType.String);
-                    leaf.CatalogLeafUrl = reader.GetString();
+                    leaf.CatalogLeafUrl = reader.ReadString();
                 }
                 else if (reader.ValueTextEquals(AtTypeName.EncodedUtf8Bytes))
                 {
                     reader.Read();
-                    //Assert(reader.TokenType == JsonTokenType.String);
+                    Debug.Assert(reader.TokenType == JsonTokenType.String);
                     if (reader.ValueTextEquals(NuGetPackageDetailsName.EncodedUtf8Bytes))
                     {
                         leaf.Type = CatalogLeafType.PackageDetails;
@@ -158,22 +153,15 @@ namespace JsonPlayground
                 }
                 else if (reader.ValueTextEquals(CommitTimestampName.EncodedUtf8Bytes))
                 {
-                    reader.Read();
-                    //Assert(reader.TokenType == JsonTokenType.String);
-                    Assert(reader.TryGetDateTimeOffset(out var commitTimestamp));
-                    leaf.CommitTimestamp = commitTimestamp;
+                    leaf.CommitTimestamp = reader.ReadDateTimeOffset();
                 }
                 else if (reader.ValueTextEquals(NuGetIdName.EncodedUtf8Bytes))
                 {
-                    reader.Read();
-                    //Assert(reader.TokenType == JsonTokenType.String);
-                    leaf.PackageId = reader.GetString();
+                    leaf.PackageId = reader.ReadString();
                 }
                 else if (reader.ValueTextEquals(NuGetVersionName.EncodedUtf8Bytes))
                 {
-                    reader.Read();
-                    //Assert(reader.TokenType == JsonTokenType.String);
-                    leaf.PackageVersion = reader.GetString();
+                    leaf.PackageVersion = reader.ReadString();
                 }
                 else
                 {
@@ -181,17 +169,52 @@ namespace JsonPlayground
                     reader.Skip();
                 }
 
-                Assert(reader.Read());
+                reader.Read();
             }
 
-            //Assert(reader.TokenType == JsonTokenType.EndObject);
+            Debug.Assert(reader.TokenType == JsonTokenType.EndObject);
 
-            return leaf;
+            return true;
         }
 
-        private static void Assert(bool condition, string message = "")
+        private static void ReadStartObject(ref this Utf8JsonReader reader)
         {
-            //if (!condition) throw new Exception(message);
+            Debug.Assert(reader.Read());
+            Debug.Assert(reader.TokenType == JsonTokenType.StartObject);
+        }
+
+        private static void ReadStartArray(ref this Utf8JsonReader reader)
+        {
+            Debug.Assert(reader.Read());
+            Debug.Assert(reader.TokenType == JsonTokenType.StartArray);
+        }
+
+        private static string ReadString(ref this Utf8JsonReader reader)
+        {
+            Debug.Assert(reader.Read());
+            Debug.Assert(reader.TokenType == JsonTokenType.String);
+
+            return reader.GetString();
+        }
+
+        private static int ReadInt32(ref this Utf8JsonReader reader)
+        {
+            Debug.Assert(reader.Read());
+            Debug.Assert(reader.TokenType == JsonTokenType.Number);
+
+            return reader.GetInt32();
+        }
+
+        private static DateTimeOffset ReadDateTimeOffset(ref this Utf8JsonReader reader)
+        {
+            reader.Read();
+            Debug.Assert(reader.TokenType == JsonTokenType.String);
+            if (!reader.TryGetDateTimeOffset(out var commitTimestamp))
+            {
+                Debug.Fail(message: null);
+            }
+
+            return commitTimestamp;
         }
     }
 
@@ -199,6 +222,10 @@ namespace JsonPlayground
     {
         public static void Main(string[] args)
         {
+            //var bytes = Encoding.UTF8.GetBytes(TestData.CatalogPage);
+            //var reader = new Utf8JsonReader(bytes);
+            //var result = reader.ReadCatalogPage();
+
             var summary = BenchmarkRunner.Run<Json>();
         }
     }
